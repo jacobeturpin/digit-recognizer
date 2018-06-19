@@ -34,12 +34,8 @@ class CsvImageDataset(Dataset):
     def __getitem__(self, item):
         single_image_label = self.labels[item]
 
-        img_as_np = np.ones((28, 28), dtype='uint8')
-
-        for i in range(1, self.data.shape[1]):
-            row_pos = (i-1) // self.height
-            col_pos = (i-1) % self.width
-            img_as_np[row_pos][col_pos] = self.data.iloc[item][i]
+        image_data = np.asarray(self.data.iloc[item, 1:], dtype='uint8')
+        img_as_np = np.reshape(image_data, (28, 28))
 
         img_as_img = Image.fromarray(img_as_np)
         img_as_img = img_as_img.convert('L')
@@ -166,7 +162,7 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch)
-        test(args, model, device, test_loader)
+        # test(args, model, device, test_loader)
 
     torch.save(model.state_dict(), '.')
 
