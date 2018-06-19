@@ -14,9 +14,41 @@ from PIL import Image
 import torchvision
 
 
+class PredictCsvDataset(Dataset):
+
+    def __init__(self, csv_path, height, width, transforms=None):
+        """
+        Args:
+            df (pd.DataFrame): path to csv file
+            height (int): height of image
+            width (int): width of image
+            transforms: torch transformations and tensor conversions
+        """
+        self.data = pd.read_csv(csv_path)
+        self.height = height
+        self.width = width
+        self.transforms = transforms
+
+    def __getitem__(self, item):
+
+        image_data = np.asarray(self.data.iloc[item], dtype='uint8')
+        img_as_np = np.reshape(image_data, (28, 28))
+
+        img_as_img = Image.fromarray(img_as_np)
+        img_as_img = img_as_img.convert('L')
+
+        if self.transforms is not None:
+            img_as_tensor = self.transforms(img_as_img)
+
+        return img_as_tensor
+
+    def __len__(self):
+        return len(self.data.index)
+
+
 class PandasImageDataset(Dataset):
 
-    def __init__(self, df, height, width, transforms=None, shuffle=False):
+    def __init__(self, df, height, width, transforms=None):
         """
         Args:
             df (pd.DataFrame): path to csv file
@@ -110,6 +142,31 @@ def test(args, model, device, test_loader):
     ))
 
 
+def predict(args, model, device, submission_loader):
+    """Takes input data and creates predictions based upon model
+
+    Args:
+         args (object): set of arguments defining model
+         model (Net): torch model
+         device (torch.device): device where tensors are allocated
+         submission_loader (DataLoader): object used to load data into predictions
+
+    Returns:
+        pd.DataFrame of predictions for input data
+    """
+    model.eval()
+
+    predictions = []
+
+    with torch.no_grad():
+        for idx, data in enumerate(submission_loader):
+            output = model(data)
+            pred_batch = output.max(1, keepdim=True)[1]
+            predictions.extend(pred_batch.tolist())
+
+    return predictions
+
+
 def main():
     # Training Settings
     parser = argparse.ArgumentParser(description='PyTorch Digit Recognizer')
@@ -153,15 +210,13 @@ def main():
                                        torchvision.transforms.Compose([
                                            torchvision.transforms.ToTensor(),
                                            torchvision.transforms.Normalize((0.1307,), (0.3081,))
-                                       ]),
-                                       shuffle=True)
+                                       ]))
 
     test_dataset = PandasImageDataset(test_set, 28, 28,
                                       torchvision.transforms.Compose([
                                           torchvision.transforms.ToTensor(),
                                           torchvision.transforms.Normalize((0.1307,), (0.3081,))
-                                      ]),
-                                      shuffle=True)
+                                      ]))
 
     train_loader = DataLoader(
         train_dataset,
@@ -171,15 +226,13 @@ def main():
         test_dataset,
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
-    '''
     submission_loader = DataLoader(
-        PandasImageDataset('test.csv', 28, 28,
-                           torchvision.transforms.Compose([
+        PredictCsvDataset('test.csv', 28, 28,
+                          torchvision.transforms.Compose([
                                torchvision.transforms.ToTensor(),
                                torchvision.transforms.Normalize((0.1307,), (0.3081,))
                            ])),
-        batch_size=args.test_batch_size, shuffle=True, **kwargs)
-    '''
+        batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
     model = Net().to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
@@ -189,6 +242,12 @@ def main():
         test(args, model, device, test_loader)
 
     # torch.save(model.state_dict(), '.')
+
+    predictions = predict(args, model, device, submission_loader)
+    pred_df = pd.DataFrame(predictions, columns=['Label'])
+    pred_df.index += 1
+    pred_df.index.names = ['ImageId']
+    pred_df.to_csv('submission.csv')
 
 
 if __name__ == '__main__':
