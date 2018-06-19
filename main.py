@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -142,7 +143,7 @@ def main():
     train_loader = DataLoader(
         CsvImageDataset('train.csv', 28, 28,
                         torchvision.transforms.Compose([torchvision.transforms.ToTensor()])),
-        batch_size=args.test_batch_size, shuffle=True, **kwargs)
+        batch_size=args.batch_size, shuffle=True, **kwargs)
 
     test_loader = DataLoader(
         CsvImageDataset('test.csv', 28, 28,
@@ -155,6 +156,8 @@ def main():
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch)
         test(args, model, device, test_loader)
+
+    torch.save(model.state_dict(), '.')
 
 
 if __name__ == '__main__':
