@@ -23,7 +23,7 @@ class CsvImageDataset(Dataset):
             csv_path (str): path to csv file
             height (int): height of image
             width (int): width of image
-            transforms: pytorch transformations and tensor conversions
+            transforms: torch transformations and tensor conversions
         """
         self.data = pd.read_csv(csv_path)
         self.labels = np.asarray(self.data.iloc[:, 0])
@@ -79,6 +79,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
     for batch_idx, (data, target) in enumerate(train_loader):
         # data, target = _
         data, target = data.to(device), target.to(device)
+
         optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output, target)
@@ -93,14 +94,18 @@ def train(args, model, device, train_loader, optimizer, epoch):
 
 def test(args, model, device, test_loader):
     model.eval()
+
     test_loss = 0
     correct = 0
+
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
+
             output = model(data)
             test_loss += F.nll_loss(output, target, size_average=False).item()
             pred = output.max(1, keepdim=True)[1]
+
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
@@ -142,12 +147,18 @@ def main():
 
     train_loader = DataLoader(
         CsvImageDataset('train.csv', 28, 28,
-                        torchvision.transforms.Compose([torchvision.transforms.ToTensor()])),
+                        torchvision.transforms.Compose([
+                            torchvision.transforms.ToTensor(),
+                            torchvision.transforms.Normalize((0.1307,), (0.3081,))
+                        ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
 
     test_loader = DataLoader(
         CsvImageDataset('test.csv', 28, 28,
-                        torchvision.transforms.Compose([torchvision.transforms.ToTensor()])),
+                        torchvision.transforms.Compose([
+                            torchvision.transforms.ToTensor(),
+                            torchvision.transforms.Normalize((0.1307,), (0.3081,))
+                        ])),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
     model = Net().to(device)
